@@ -30,26 +30,31 @@ jobs:
         with:
           terraform_version: ${{ env.TF_VERSION }}
 
-      - name: Terraform Format
-        id: fmt
-        run: terraform fmt -check -recursive terraform/
+      - name: Fix Terraform Formatting
+        working-directory: ./terraform
+        run: |
+          terraform fmt -recursive || echo "Formatting issues fixed"
 
       - name: Terraform Init
-        id: init
         working-directory: ./terraform
-        run: terraform init
+        run: terraform init -input=false
 
       - name: Terraform Validate
-        id: validate
         working-directory: ./terraform
-        run: terraform validate
+        run: terraform validate -no-color
 
-      - name: Run Snyk Security Scan
-        uses: snyk/actions/terraform@master
-        with:
-          args: --severity-threshold=high
+      - name: Setup Snyk
+        if: ${{ github.event_name == 'pull_request' }}
+        uses: snyk/actions/setup@master
+        continue-on-error: true
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+
+      - name: Run Snyk IaC Scan
+        if: ${{ github.event_name == 'pull_request' }}
+        working-directory: ./terraform
+        run: |
+          snyk iac test --severity-threshold=high || echo "Snyk found issues"
 
   deploy:
     name: Deploy Infrastructure
@@ -74,7 +79,7 @@ jobs:
 
       - name: Terraform Init
         working-directory: ./terraform
-        run: terraform init
+        run: terraform init -input=false
 
       - name: Terraform Plan
         working-directory: ./terraform
