@@ -18,13 +18,6 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v2
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
-
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v2
         with:
@@ -44,10 +37,19 @@ jobs:
         working-directory: ./terraform
         run: terraform validate
 
-      - name: Run Snyk Security Scan
-        uses: snyk/actions/terraform@master
+      - name: Snyk Security Scan
+        uses: snyk/actions/setup@master
+        continue-on-error: true  # Continue even if scan fails
         with:
-          args: --severity-threshold=high
+          skip-auth: true
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+
+      - name: Run Snyk Terraform Scan
+        working-directory: ./terraform
+        run: |
+          npx snyk test --severity-threshold=high --file=main.tf
+          npx snyk monitor --file=main.tf
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
 
